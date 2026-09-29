@@ -4,7 +4,7 @@
 > **Proyecto · Backend Completo — Arquitectura Multitenant**
 > **Autor:** Manuel Aguirre
 >
-> **Repositorio:** [[https://github.com/Jmanolo2004/fitelyback-saas-backend](https://github.com/Manolooo04/FitelyBack-Cala-Backend)]([https://github.com/Jmanolo2004/fitelyback-saas-backend](https://github.com/Manolooo04/FitelyBack-Cala-Backend))
+> **Repositorio:** [[[https://github.com/Manolooo04/FitelyBack-Cala-Backend](https://github.com/Manolooo04/FitelyBack-Cala-Backend)]
 > **Deployment (Vercel + Supabase):** [http://api.fitelyback.com/api/v1](http://api.fitelyback.com/api/v1)
 > **Swagger:** [http://api.fitelyback.com/swagger-ui/index.html](http://api.fitelyback.com/swagger-ui/index.html)
 
