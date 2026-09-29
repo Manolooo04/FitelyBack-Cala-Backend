@@ -1,8 +1,8 @@
 # FitelyBack SaaS — Backend
 
-> **CS 2031 · Desarrollo Basado en Plataforma**
+> **Empresa · Cala Negocios e Inversiones**
 > **Proyecto · Backend Completo — Arquitectura Multitenant**
-> **Autor:** Manuel Aguirre
+> **Autor:** Manuel Aguirre, José Huamaní 
 >
 > **Repositorio:** [[[https://github.com/Manolooo04/FitelyBack-Cala-Backend](https://github.com/Manolooo04/FitelyBack-Cala-Backend)]
 > 
@@ -33,7 +33,7 @@
 
 FitelyBack es una plataforma SaaS B2B de fidelización multicanal que permite a franquicias y negocios administrar programas de lealtad sin fricción. El sistema integra tarjetas digitales nativas (Apple Wallet y Google Wallet) y un CRM completamente automatizado impulsado por la API oficial de WhatsApp Cloud.
 
-El backend centraliza una arquitectura *multitenant* estricta, aislando la gestión de sucursales, clientes, plantillas de tarjetas, transacciones de caja y telemetría de mensajería.
+El backend centraliza una arquitectura *multitenant* estricta, aislando la gestión de sucursales, clientes, plantillas de tarjetas, escaneos de códigos QR y telemetría de mensajería.
 
 El proyecto expone una API REST versionada bajo `/api/v1`, utiliza PostgreSQL (Supabase) y aplica una arquitectura de capas Controller → Service → Repository. Cumple con los criterios técnicos avanzados: modelo relacional con aislamiento de datos, DTOs inmutables (Records), manejo global de excepciones, seguridad JWT con RBAC, asincronía estricta para APIs de terceros y documentación OpenAPI.
 
@@ -43,7 +43,7 @@ El proyecto expone una API REST versionada bajo `/api/v1`, utiliza PostgreSQL (S
 
 Los programas de fidelización tradicionales exigen que el cliente descargue aplicaciones pesadas de terceros, lo que genera una alta fricción y abandono. Además, la comunicación posterior depende de correos electrónicos con bajas tasas de apertura.
 
-FitelyBack resuelve este problema centralizando la experiencia en herramientas que el usuario ya utiliza a diario. El cliente escanea un QR físico, guarda su pase directamente en su Wallet nativo y, a partir de ahí, la retención es gestionada de forma 100% pasiva y automatizada a través de WhatsApp. Para el dueño del negocio, el sistema ofrece un panel administrativo que consolida métricas, gestión de equipo y control de reputación digital sin carga operativa para sus cajeros.
+FitelyBack resuelve este problema centralizando la experiencia en herramientas que el usuario ya utiliza a diario. El cliente escanea un QR físico, guarda su pase directamente en su Wallet nativo y, a partir de ahí, la retención es gestionada de forma 100% pasiva y automatizada a través de WhatsApp. Para el dueño del negocio, el sistema ofrece un panel administrativo que consolida métricas, gestión de equipo y control de reputación digital sin carga operativa para el personal en tienda.
 
 ---
 
@@ -56,7 +56,7 @@ FitelyBack resuelve este problema centralizando la experiencia en herramientas q
 - Registro, login y control de accesos (RBAC) con JWT para roles `ADMIN` y `STAFF`.
 - Creación y administración de `TarjetaPlantilla` (configuración visual, metas, límites).
 - Emisión dinámica de tarjetas a clientes (`TarjetaEmitida`).
-- Registro transaccional de caja para suma de estampillas y canjes de premios.
+- Registro transaccional en tienda mediante escaneo de códigos QR para suma de estampillas y canjes de premios.
 - Integración asíncrona con **WhatsApp Cloud API** para triggers de Bienvenida, Sellos, Premios, Reactivación y Cumpleaños.
 - Webhooks públicos para recibir actualizaciones de estado de Meta (`sent`, `delivered`, `read`, `failed`).
 - Consultas espaciales (Geolocalización) para campañas GeoPush.
@@ -79,17 +79,17 @@ FitelyBack resuelve este problema centralizando la experiencia en herramientas q
 
 ## 4. Modelo de entidades
 
-El modelo de datos se basa en el aislamiento por `negocio_id` (Tenant). Se contemplan las siguientes entidades principales para el MVP:
+El modelo de datos se basa en el aislamiento por `negocio_id` (Tenant). Se contemplan 8 entidades principales para el MVP:
 
 | Entidad | Propósito |
 |---|---|
 | `Negocio` | Tenant raíz. Almacena credenciales de Meta y datos de la empresa. |
 | `Suscripcion` | Controla el plan actual y el saldo de cuotas de mensajes de WhatsApp. |
-| `User` | Accesos al panel: Dueños (`ADMIN`) y personal de caja (`STAFF`). |
+| `User` | Accesos al panel y app: Dueños (`ADMIN`) y personal operativo (`STAFF`). |
 | `TarjetaPlantilla` | Diseño maestro de la tarjeta (colores, límite de sellos, reglas). |
 | `Cliente` | Perfil del consumidor validado por número de teléfono. |
-| `TarjetaEmitida` | Puente transaccional. Guarda el progreso actual (ej. 4/10 sellos) y estado en Wallet. |
-| `TransaccionCaja` | Registro inmutable de cada escaneo en tienda (Suma de sello o Canje). |
+| `TarjetaEmitida` | Puente operativo. Guarda el progreso actual (ej. 4/10 sellos) y estado en Wallet. |
+| `EscaneoTarjeta` | Registro inmutable de cada lectura de QR en tienda (Suma de sello o Canje de premio). |
 | `MensajeLog` | Auditoría de Webhooks de Meta (`message_id`, estado, fecha). |
 
 ### Diagrama ER
@@ -100,10 +100,10 @@ erDiagram
     NEGOCIO ||--o{ USER : employs
     NEGOCIO ||--o{ TARJETA_PLANTILLA : designs
     NEGOCIO ||--o{ MENSAJE_LOG : tracks
-    USER ||--o{ TRANSACCION_CAJA : executes
+    USER ||--o{ ESCANEO_TARJETA : executes
     TARJETA_PLANTILLA ||--o{ TARJETA_EMITIDA : generates
     CLIENTE ||--o{ TARJETA_EMITIDA : owns
-    TARJETA_EMITIDA ||--o{ TRANSACCION_CAJA : records
+    TARJETA_EMITIDA ||--o{ ESCANEO_TARJETA : records
 ```
 
 Todas las relaciones utilizan `LAZY` fetching explícito para optimizar consultas.
@@ -159,7 +159,7 @@ Ejemplo de respuesta de error al intentar enviar un mensaje sin saldo en el plan
   "status": 402,
   "error": "Payment Required",
   "message": "La cuota de mensajes mensuales del plan ha sido agotada.",
-  "path": "/api/v1/transacciones",
+  "path": "/api/v1/escaneos",
   "fieldErrors": {}
 }
 ```
@@ -172,7 +172,7 @@ La seguridad es el pilar de la plataforma SaaS:
 
 - **Aislamiento de Datos (Multitenancy):** El ID del negocio (`tenant_id`) se extrae del JWT y se inyecta en un contexto de sesión. Todo servicio fuerza internamente un `WHERE negocio_id = ?` para garantizar que un trabajador no acceda a datos de otra franquicia.
 - **JWT y Filtros:** `JwtAuthenticationFilter` extrae el token del header `Authorization`.
-- **RBAC:** Uso estricto de `@PreAuthorize("hasRole('ADMIN')")` para endpoints de configuración (ej. Crear Tarjeta) y `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")` para la operativa de escaneo en caja.
+- **RBAC:** Uso estricto de `@PreAuthorize("hasRole('ADMIN')")` para endpoints de configuración (ej. Crear Tarjeta) y `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")` para la operativa de lectura de QR en tienda.
 - Las contraseñas están hasheadas con **BCrypt**.
 - Se utilizan **Records** como DTOs y **MapStruct** para evitar exponer las entidades JPA directamente.
 
@@ -182,8 +182,8 @@ La seguridad es el pilar de la plataforma SaaS:
 
 El rendimiento operativo en tienda física no puede verse afectado por latencias de red. Por ello, la comunicación con WhatsApp se desacopla mediante eventos:
 
-1. Un cajero registra una visita (`POST /api/v1/transacciones`).
-2. El servicio guarda en PostgreSQL, publica un `SelloAgregadoEvent` y retorna `200 OK` al instante.
+1. El staff lee el QR de un cliente (`POST /api/v1/escaneos`).
+2. El servicio guarda el `EscaneoTarjeta` en PostgreSQL, publica un `SelloAgregadoEvent` y retorna `200 OK` al instante para no bloquear al personal.
 3. Un método anotado con `@Async` (ejecutado por `ThreadPoolTaskExecutor`) intercepta el evento.
 4. En segundo plano, se valida el saldo del plan, se arma la plantilla JSON y se ejecuta la llamada a la Graph API de Meta.
 
@@ -202,7 +202,7 @@ Para retención pasiva, tareas anotadas con `@Scheduled` (Cron Jobs) buscan de m
 
 ## 10. Conclusión
 
-El backend de FitelyBack establece una base sólida para un SaaS B2B escalable. Al implementar un diseño multitenant, asincronía estricta para integraciones externas y un modelo de datos relacional robusto, el sistema puede procesar escaneos en tiempo real y disparar notificaciones automatizadas sin comprometer el rendimiento en el punto de venta.
+El backend de FitelyBack establece una base sólida para un SaaS B2B escalable. Al implementar un diseño multitenant, asincronía estricta para integraciones externas y un modelo de datos relacional robusto, el sistema puede procesar lecturas de códigos QR en tiempo real y disparar notificaciones automatizadas sin comprometer el rendimiento operativo.
 
 El cumplimiento estricto de principios REST, DTOs inmutables, seguridad JWT y separación de responsabilidades garantiza que la plataforma pueda escalar financieramente su modelo de suscripciones mientras mantiene los datos corporativos completamente protegidos.
 
@@ -229,7 +229,7 @@ META_WHATSAPP_TOKEN=
 | `POST` | `/api/v1/auth/login` | Login y emisión de JWT | Pública |
 | `POST` | `/api/v1/tarjetas-plantilla` | Crear nuevo diseño de programa | ADMIN |
 | `GET` | `/api/v1/tarjetas-emitidas` | Listar progreso de clientes | ADMIN / STAFF |
-| `POST` | `/api/v1/transacciones` | Registrar escaneo y disparar `SelloAgregadoEvent` | ADMIN / STAFF |
+| `POST` | `/api/v1/escaneos` | Registrar lectura de QR y disparar `SelloAgregadoEvent` | ADMIN / STAFF |
 | `POST` | `/api/v1/webhooks/whatsapp` | Recibir estado de lectura de Meta | Pública (Secret) |
 
 ---
