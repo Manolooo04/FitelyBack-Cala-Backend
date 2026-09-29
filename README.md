@@ -1,7 +1,3 @@
-# FitelyBack-Cala-Backend
-Backend oficial de la plataforma de FitelyBack, estructura, lógica, eventos y API Rest controllers
-
-
 # FitelyBack SaaS — Backend
 
 > **CS 2031 · Desarrollo Basado en Plataforma**
