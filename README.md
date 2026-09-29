@@ -1,13 +1,15 @@
 # FitelyBack SaaS — Backend
 
 > **Empresa · Cala Negocios e Inversiones**
+
 > **Proyecto · Backend Completo — Arquitectura Multitenant**
+
 > **Autor:** Manuel Aguirre, José Huamaní 
->
+
 > **Repositorio:** [[[https://github.com/Manolooo04/FitelyBack-Cala-Backend](https://github.com/Manolooo04/FitelyBack-Cala-Backend)]
-> 
+
 > **Deployment (Vercel + Supabase):** [http://api.fitelyback.com/api/v1](http://api.fitelyback.com/api/v1)
-> 
+
 > **Swagger:** [http://api.fitelyback.com/swagger-ui/index.html](http://api.fitelyback.com/swagger-ui/index.html)
 
 ---
