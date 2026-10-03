@@ -62,6 +62,7 @@ FitelyBack resuelve este problema centralizando la experiencia en herramientas q
 - Integración asíncrona con **WhatsApp Cloud API** para triggers de Bienvenida, Sellos, Premios, Reactivación y Cumpleaños.
 - Webhooks públicos para recibir actualizaciones de estado de Meta (`sent`, `delivered`, `read`, `failed`).
 - Consultas espaciales (Geolocalización) para campañas GeoPush.
+- Gestión Multisede (Ubicaciones) con control estricto de límites por plan y validación de Add-ons de expansión comercial.
 
 ### Tecnologías
 
@@ -87,6 +88,7 @@ El modelo de datos se basa en el aislamiento por `negocio_id` (Tenant). Se conte
 |---|---|
 | `Negocio` | Tenant raíz. Almacena credenciales de Meta y datos de la empresa. |
 | `Suscripcion` | Controla el plan actual y el saldo de cuotas de mensajes de WhatsApp. |
+| `Ubicación` | Sucursal física. Aísla las métricas de visitas y restringe el acceso del personal de caja por local. |
 | `User` | Accesos al panel y app: Dueños (`ADMIN`) y personal operativo (`STAFF`). |
 | `TarjetaPlantilla` | Diseño maestro de la tarjeta (colores, límite de sellos, reglas). |
 | `Cliente` | Perfil del consumidor validado por número de teléfono. |
@@ -106,6 +108,17 @@ erDiagram
     TARJETA_PLANTILLA ||--o{ TARJETA_EMITIDA : generates
     CLIENTE ||--o{ TARJETA_EMITIDA : owns
     TARJETA_EMITIDA ||--o{ ESCANEO_TARJETA : records
+
+    %% Nivel Operativo (El Filtro de Ubicación)
+    UBICACION |o--o{ USER : assigns_staff
+    UBICACION ||--o{ TARJETA_EMITIDA : issues_card
+    UBICACION ||--o{ ESCANEO_TARJETA : registers_scan
+
+    %% Nivel del Consumidor y Transacciones
+    CLIENTE ||--o{ TARJETA_EMITIDA : owns
+    TARJETA_PLANTILLA ||--o{ TARJETA_EMITIDA : generates
+    TARJETA_EMITIDA ||--o{ ESCANEO_TARJETA : receives
+    USER ||--o{ ESCANEO_TARJETA : executes
 ```
 
 Todas las relaciones utilizan `LAZY` fetching explícito para optimizar consultas.
@@ -174,7 +187,7 @@ La seguridad es el pilar de la plataforma SaaS:
 
 - **Aislamiento de Datos (Multitenancy):** El ID del negocio (`tenant_id`) se extrae del JWT y se inyecta en un contexto de sesión. Todo servicio fuerza internamente un `WHERE negocio_id = ?` para garantizar que un trabajador no acceda a datos de otra franquicia.
 - **JWT y Filtros:** `JwtAuthenticationFilter` extrae el token del header `Authorization`.
-- **RBAC:** Uso estricto de `@PreAuthorize("hasRole('ADMIN')")` para endpoints de configuración (ej. Crear Tarjeta) y `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")` para la operativa de lectura de QR en tienda.
+- **RBAC:** Uso estricto de `@PreAuthorize("hasRole('ADMIN')")` para endpoints de configuración global, y `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")` para la operativa de caja. El sistema valida internamente que un usuario STAFF solo pueda registrar escaneos y ver métricas de su Ubicacion asignada.
 - Las contraseñas están hasheadas con **BCrypt**.
 - Se utilizan **Records** como DTOs y **MapStruct** para evitar exponer las entidades JPA directamente.
 
@@ -229,21 +242,23 @@ META_WHATSAPP_TOKEN=
 | Método | Endpoint | Descripción | Auth |
 |---|---|---|---|
 | `POST` | `/api/v1/auth/login` | Login y emisión de JWT | Pública |
+| `GET` | `/api/v1/ubicaciones` | Listar sedes para llenar el filtro global | ADMIN / STAFF |
+| `POST` | `/api/v1/ubicaciones` | Crear nueva sede (Valida el límite del plan) | ADMIN |
 | `POST` | `/api/v1/tarjetas-plantilla` | Crear nuevo diseño de programa | ADMIN |
-| `GET` | `/api/v1/tarjetas-emitidas` | Listar progreso de clientes | ADMIN / STAFF |
-| `POST` | `/api/v1/escaneos` | Registrar lectura de QR y disparar `SelloAgregadoEvent` | ADMIN / STAFF |
+| `GET` | `/api/v1/tarjetas-emitidas` | Listar progreso (Admite filtro `?ubicacionId=X`) | ADMIN / STAFF |
+| `POST` | `/api/v1/escaneos` | Registrar lectura de QR vinculada a una sede | ADMIN / STAFF |
 | `POST` | `/api/v1/webhooks/whatsapp` | Recibir estado de lectura de Meta | Pública (Secret) |
 
 ---
 
-## 12. Criterios cubiertos por la rúbrica
+## 12. Criterios evidencia del proyecto
 
-| Criterio | Evidencia en el proyecto |
+| Criterio | Evidencia del proyecto |
 |---|---|
-| Entidades | Entidades relacionales con aislamiento por `negocio_id`. |
+| Entidades | Entidades relacionales con aislamiento por `negocio_id` y control por `ubicacion_id`. |
 | DTOs y Mapeo | Uso de Records (Java 14+) inmutables y MapStruct. |
 | Arquitectura | Package by Feature, SRP y Patrón Strategy implementados. |
 | Excepciones | `@RestControllerAdvice` con respuestas estructuradas. |
-| Seguridad | Filtros JWT, Multitenancy seguro y RBAC. |
+| Seguridad | Filtros JWT, Multitenancy seguro y RBAC con restricción de sede. |
 | Asincronía | `@Async` y Spring Events para comunicación con Meta API. |
 | Diseño REST | Uso correcto de verbos HTTP, plurales y versión `/v1/`. |
