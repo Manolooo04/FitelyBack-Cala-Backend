@@ -2,7 +2,11 @@ package com.fitelyback.backend.modules.tenant.clientes.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
 
 public record ClienteRequest(
 
@@ -18,6 +22,11 @@ public record ClienteRequest(
         @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
         String telefono,
 
+        @NotNull(message = "La fecha de nacimiento es obligatoria")
+        @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
+        LocalDate fechaNacimiento,
+
+        // Opcional: el registro del cliente no lo pide
         @Email(message = "El correo no tiene un formato válido")
         @Size(max = 100, message = "El correo no puede superar los 100 caracteres")
         String email

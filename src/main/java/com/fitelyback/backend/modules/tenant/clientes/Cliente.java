@@ -4,6 +4,7 @@ import com.fitelyback.backend.modules.tenant.Negocio;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,8 +35,11 @@ public class Cliente {
     @Column(nullable = false, length = 20)
     private String telefono;
 
+    // Opcional: el registro del cliente no lo pide
     @Column(length = 100)
     private String email;
+
+    private LocalDate fechaNacimiento;
 
     @Column(updatable = false)
     private LocalDateTime fechaRegistro;

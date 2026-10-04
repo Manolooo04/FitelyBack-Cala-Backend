@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public record UbicacionRequest(
 
@@ -33,5 +34,9 @@ public record UbicacionRequest(
 
         @Min(value = 50, message = "El radio mínimo es de 50 metros")
         @Max(value = 1500, message = "El radio máximo es de 1500 metros")
-        Integer radioMetros
+        Integer radioMetros,
+
+        //Opcional: solo se cambia si se envía
+        @Pattern(regexp = "\\d{4,6}", message = "El PIN debe tener entre 4 y 6 dígitos")
+        String pin
 ) {}

@@ -1,5 +1,6 @@
 package com.fitelyback.backend.modules.tenant.clientes.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record ClienteResponse(
@@ -7,6 +8,7 @@ public record ClienteResponse(
         String nombre,
         String apellido,
         String telefono,
+        LocalDate fechaNacimiento,
         String email,
         LocalDateTime fechaRegistro
 ) {}

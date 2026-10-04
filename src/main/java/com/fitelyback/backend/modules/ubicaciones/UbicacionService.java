@@ -6,6 +6,7 @@ import com.fitelyback.backend.modules.ubicaciones.dto.UbicacionRequest;
 import com.fitelyback.backend.modules.ubicaciones.dto.UbicacionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ public class UbicacionService {
 
     private final UbicacionRepository ubicacionRepository;
     private final NegocioRepository negocioRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
     public List<UbicacionResponse> listar(Long negocioId) {
@@ -47,6 +49,7 @@ public class UbicacionService {
                 .latitud(request.latitud())
                 .longitud(request.longitud())
                 .radioMetros(radioO(request.radioMetros()))
+                .pin(request.pin() != null ? passwordEncoder.encode(request.pin()) : null)
                 .negocio(negocioRepository.getReferenceById(negocioId))
                 .build();
 
@@ -68,6 +71,11 @@ public class UbicacionService {
         ubicacion.setLatitud(request.latitud());
         ubicacion.setLongitud(request.longitud());
         ubicacion.setRadioMetros(radioO(request.radioMetros()));
+
+        // El PIN solo cambia si se envía uno nuevo
+        if (request.pin() != null) {
+            ubicacion.setPin(passwordEncoder.encode(request.pin()));
+        }
 
         return aResponse(ubicacion);
     }
@@ -97,6 +105,7 @@ public class UbicacionService {
                 u.getLatitud(),
                 u.getLongitud(),
                 u.getRadioMetros(),
+                u.getPin() != null,
                 u.getFechaCreacion()
         );
     }

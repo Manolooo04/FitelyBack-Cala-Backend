@@ -11,5 +11,6 @@ public record UbicacionResponse(
         Double latitud,
         Double longitud,
         Integer radioMetros,
+        boolean tienePin,
         LocalDateTime fechaCreacion
 ) {}

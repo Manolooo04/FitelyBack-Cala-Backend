@@ -41,6 +41,7 @@ public class ClienteService {
                 .nombre(request.nombre())
                 .apellido(request.apellido())
                 .telefono(request.telefono())
+                .fechaNacimiento(request.fechaNacimiento())
                 .email(request.email())
                 .negocio(negocioRepository.getReferenceById(negocioId))
                 .build();
@@ -59,6 +60,7 @@ public class ClienteService {
         cliente.setNombre(request.nombre());
         cliente.setApellido(request.apellido());
         cliente.setTelefono(request.telefono());
+        cliente.setFechaNacimiento(request.fechaNacimiento());
         cliente.setEmail(request.email());
 
         return aResponse(cliente);
@@ -81,6 +83,7 @@ public class ClienteService {
                 cliente.getNombre(),
                 cliente.getApellido(),
                 cliente.getTelefono(),
+                cliente.getFechaNacimiento(),
                 cliente.getEmail(),
                 cliente.getFechaRegistro()
         );

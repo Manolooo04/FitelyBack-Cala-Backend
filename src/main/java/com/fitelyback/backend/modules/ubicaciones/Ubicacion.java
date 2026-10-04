@@ -46,6 +46,9 @@ public class Ubicacion {
     @Column(nullable = false)
     private Integer radioMetros;
 
+    // PIN cifrado de la tienda, para abrir la pantalla de Caja
+    private String pin;
+
     @Column(updatable = false)
     private LocalDateTime fechaCreacion;
 
