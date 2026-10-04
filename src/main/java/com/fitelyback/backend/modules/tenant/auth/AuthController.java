@@ -5,6 +5,7 @@ import com.fitelyback.backend.modules.tenant.auth.dto.LoginRequest;
 import com.fitelyback.backend.modules.tenant.auth.dto.RegistroRequest;
 import com.fitelyback.backend.modules.tenant.auth.dto.UserProfileResponse;
 import com.fitelyback.backend.security.UsuarioAutenticado;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,12 +19,12 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registrar(@RequestBody RegistroRequest request) {
+    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody RegistroRequest request) {
         return ResponseEntity.ok(authService.registrar(request));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
 

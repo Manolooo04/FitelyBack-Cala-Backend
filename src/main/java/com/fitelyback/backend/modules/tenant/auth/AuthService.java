@@ -1,5 +1,6 @@
 package com.fitelyback.backend.modules.tenant.auth;
 
+import com.fitelyback.backend.exception.ApiException;
 import com.fitelyback.backend.modules.tenant.Negocio;
 import com.fitelyback.backend.modules.tenant.NegocioRepository;
 import com.fitelyback.backend.modules.tenant.auth.dto.AuthResponse;
@@ -12,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +26,7 @@ public class AuthService {
     @Transactional
     public AuthResponse registrar(RegistroRequest request) {
         if (usuarioRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("El correo ya se encuentra registrado");
+            throw new ApiException(HttpStatus.CONFLICT, "El correo ya se encuentra registrado");
         }
 
         // 1. Crear y guardar el negocio matriz
@@ -61,10 +61,10 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         Usuario usuario = usuarioRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Credenciales inválidas"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
 
         if (!passwordEncoder.matches(request.getPassword(), usuario.getPassword())) {
-            throw new RuntimeException("Credenciales inválidas");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
 
         String token = jwtService.generarToken(usuario.getEmail(), usuario.getNegocio().getId());
@@ -80,7 +80,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserProfileResponse obtenerPerfil(String email) {
         Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         Negocio negocio = usuario.getNegocio();
 
