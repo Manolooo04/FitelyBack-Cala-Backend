@@ -36,19 +36,20 @@ public class AuthService {
                 .build();
         negocio = negocioRepository.save(negocio);
 
-        // 2. Crear y guardar el usuario administrador con clave encriptada en BCrypt
+        // 2. Crear y guardar el usuario dueño del negocio (ADMIN) con clave encriptada en BCrypt
         Usuario usuario = Usuario.builder()
                 .nombre(request.getNombre())
                 .apellido(request.getApellido())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .proveedor(ProveedorAuth.LOCAL)
+                .rol(Rol.ADMIN)
                 .negocio(negocio)
                 .build();
         usuarioRepository.save(usuario);
 
-        // 3. Generar token JWT
-        String token = jwtService.generarToken(usuario.getEmail(), negocio.getId());
+        // 3. Generar token JWT con el rol incluido
+        String token = jwtService.generarToken(usuario.getEmail(), negocio.getId(), usuario.getRol());
 
         return AuthResponse.builder()
                 .token(token)
@@ -67,7 +68,11 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
 
-        String token = jwtService.generarToken(usuario.getEmail(), usuario.getNegocio().getId());
+        String token = jwtService.generarToken(
+                usuario.getEmail(),
+                usuario.getNegocio().getId(),
+                usuario.getRol()
+        );
 
         return AuthResponse.builder()
                 .token(token)
@@ -88,6 +93,7 @@ public class AuthService {
                 usuario.getId(),
                 usuario.getEmail(),
                 usuario.getNombre() + " " + usuario.getApellido(),
+                usuario.getRol(),
                 negocio.getId(),
                 negocio.getNombreComercial()
         );

@@ -1,5 +1,6 @@
 package com.fitelyback.backend.security;
 
+import com.fitelyback.backend.modules.tenant.auth.Rol;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -21,10 +22,11 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    public String generarToken(String email, Long negocioId) {
+    public String generarToken(String email, Long negocioId, Rol rol) {
         return Jwts.builder()
                 .subject(email)
                 .claim("negocioId", negocioId)
+                .claim("rol", rol.name())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .signWith(obtenerClaveFirma())
@@ -37,6 +39,10 @@ public class JwtService {
 
     public Long extraerNegocioId(String token) {
         return extraerClaim(token, claims -> claims.get("negocioId", Long.class));
+    }
+
+    public String extraerRol(String token) {
+        return extraerClaim(token, claims -> claims.get("rol", String.class));
     }
 
     // Devuelve false si la firma no coincide, el token expiró o está mal formado

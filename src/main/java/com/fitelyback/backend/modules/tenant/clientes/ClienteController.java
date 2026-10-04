@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,6 +45,8 @@ public class ClienteController {
         return ResponseEntity.ok(clienteService.actualizar(id, request, usuario.negocioId()));
     }
 
+    // Solo el dueño del negocio puede eliminar clientes
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id,
                                          @AuthenticationPrincipal UsuarioAutenticado usuario) {

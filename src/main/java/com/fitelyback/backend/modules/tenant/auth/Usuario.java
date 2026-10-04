@@ -3,6 +3,7 @@ package com.fitelyback.backend.modules.tenant.auth;
 import com.fitelyback.backend.modules.tenant.Negocio;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "usuarios")
@@ -32,6 +33,12 @@ public class Usuario {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProveedorAuth proveedor;
+
+    // ADMIN: dueño del negocio. STAFF: trabajador invitado.
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ADMIN'")
+    @Column(nullable = false, length = 20)
+    private Rol rol;
 
     // Cada usuario pertenece a un negocio (La empresa que registró en el formulario)
     @ManyToOne(fetch = FetchType.LAZY)

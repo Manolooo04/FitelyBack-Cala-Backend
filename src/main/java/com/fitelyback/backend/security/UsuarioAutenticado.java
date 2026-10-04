@@ -1,3 +1,5 @@
 package com.fitelyback.backend.security;
 
-public record UsuarioAutenticado(String email, Long negocioId) {}
+import com.fitelyback.backend.modules.tenant.auth.Rol;
+
+public record UsuarioAutenticado(String email, Long negocioId, Rol rol) {}
