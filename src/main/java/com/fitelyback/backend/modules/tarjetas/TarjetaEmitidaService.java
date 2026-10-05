@@ -1,0 +1,139 @@
+package com.fitelyback.backend.modules.tarjetas;
+
+import com.fitelyback.backend.exception.ApiException;
+import com.fitelyback.backend.modules.tarjetas.dto.EmitirTarjetaRequest;
+import com.fitelyback.backend.modules.tarjetas.dto.TarjetaEmitidaResponse;
+import com.fitelyback.backend.modules.tenant.clientes.Cliente;
+import com.fitelyback.backend.modules.tenant.clientes.ClienteRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class TarjetaEmitidaService {
+
+    private static final int MESES_DE_VIGENCIA = 12;
+    private static final String PREFIJO_CODIGO = "T-";
+
+    private final TarjetaEmitidaRepository tarjetaRepository;
+    private final TarjetaPlantillaRepository plantillaRepository;
+    private final ClienteRepository clienteRepository;
+
+    // Filtros opcionales: sede, plantilla y cliente
+    @Transactional(readOnly = true)
+    public List<TarjetaEmitidaResponse> listar(Long negocioId, Long ubicacionId, Long plantillaId, Long clienteId) {
+        return tarjetaRepository.findByNegocioIdOrderByFechaEmisionDesc(negocioId)
+                .stream()
+                .filter(t -> ubicacionId == null || t.getUbicacion().getId().equals(ubicacionId))
+                .filter(t -> plantillaId == null || t.getPlantilla().getId().equals(plantillaId))
+                .filter(t -> clienteId == null || t.getCliente().getId().equals(clienteId))
+                .map(this::aResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TarjetaEmitidaResponse obtener(Long id, Long negocioId) {
+        return aResponse(buscar(id, negocioId));
+    }
+
+    @Transactional
+    public TarjetaEmitidaResponse emitir(EmitirTarjetaRequest request, Long negocioId) {
+        Cliente cliente = clienteRepository.findByIdAndNegocioId(request.clienteId(), negocioId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+
+        TarjetaPlantilla plantilla = plantillaRepository.findByIdAndNegocioId(request.plantillaId(), negocioId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Tarjeta no encontrada"));
+
+        return aResponse(crearTarjeta(cliente, plantilla));
+    }
+
+    @Transactional
+    public void anular(Long id, Long negocioId) {
+        buscar(id, negocioId).setEstado(EstadoTarjeta.ANULADA);
+    }
+
+    // Crea la tarjeta de un cliente. Lo reutilizarán el registro público y el canje de recompensas.
+    @Transactional
+    public TarjetaEmitida crearTarjeta(Cliente cliente, TarjetaPlantilla plantilla) {
+        if (!plantilla.isActiva()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta no está disponible");
+        }
+        if (tarjetaRepository.existsByClienteIdAndPlantillaIdAndEstado(
+                cliente.getId(), plantilla.getId(), EstadoTarjeta.ACTIVA)) {
+            throw new ApiException(HttpStatus.CONFLICT, "El cliente ya tiene una tarjeta activa de este programa");
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+
+        TarjetaEmitida tarjeta = TarjetaEmitida.builder()
+                .codigo(PREFIJO_CODIGO + UUID.randomUUID())
+                .estado(EstadoTarjeta.ACTIVA)
+                .sellos(0)
+                .visitas(0)
+                .saldo(plantilla.getTipo() == TipoTarjeta.GIFTCARD ? plantilla.getSaldoInicial() : null)
+                .fechaEmision(ahora)
+                .fechaVencimiento(ahora.toLocalDate().plusMonths(MESES_DE_VIGENCIA))
+                .plantilla(plantilla)
+                .cliente(cliente)
+                .ubicacion(plantilla.getUbicacion())
+                .negocio(plantilla.getNegocio())
+                .build();
+
+        return tarjetaRepository.save(tarjeta);
+    }
+
+    private TarjetaEmitida buscar(Long id, Long negocioId) {
+        return tarjetaRepository.findByIdAndNegocioId(id, negocioId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Tarjeta emitida no encontrada"));
+    }
+
+    // Nivel alcanzado según las visitas acumuladas (solo tarjetas de NIVELES)
+    private String nivelActual(TarjetaEmitida tarjeta) {
+        if (tarjeta.getPlantilla().getTipo() != TipoTarjeta.NIVELES) {
+            return null;
+        }
+        return tarjeta.getPlantilla().getNiveles().stream()
+                .filter(nivel -> nivel.getVisitasMinimas() <= tarjeta.getVisitas())
+                .reduce((anterior, actual) -> actual)
+                .map(NivelConfig::getNombre)
+                .orElse(null);
+    }
+
+    private TarjetaEmitidaResponse aResponse(TarjetaEmitida t) {
+        TarjetaPlantilla plantilla = t.getPlantilla();
+        Cliente cliente = t.getCliente();
+        Integer meta = plantilla.getMetaSellos();
+
+        return new TarjetaEmitidaResponse(
+                t.getId(),
+                t.getCodigo(),
+                t.getEstado(),
+                t.getFechaVencimiento().isBefore(LocalDate.now()),
+                plantilla.getTipo(),
+                plantilla.getId(),
+                plantilla.getNombre(),
+                t.getUbicacion().getId(),
+                t.getUbicacion().getNombre(),
+                cliente.getId(),
+                cliente.getNombre() + " " + cliente.getApellido(),
+                cliente.getTelefono(),
+                t.getSellos(),
+                meta,
+                meta != null && t.getSellos() >= meta,
+                plantilla.getRecompensa(),
+                t.getVisitas(),
+                nivelActual(t),
+                t.getSaldo(),
+                tarjetaRepository.countByClienteIdAndEstado(cliente.getId(), EstadoTarjeta.CANJEADA),
+                t.getFechaEmision(),
+                t.getFechaVencimiento()
+        );
+    }
+}
