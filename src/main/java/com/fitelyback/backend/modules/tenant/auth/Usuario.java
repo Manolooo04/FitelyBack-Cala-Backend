@@ -6,6 +6,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 @Entity
 @Table(name = "usuarios")
 @Getter
@@ -41,13 +44,20 @@ public class Usuario {
     @Column(nullable = false, length = 20)
     private Rol rol;
 
-    // PIN cifrado para la interfaz de escaneo en caja (opcional)
-    private String pin;
-
-    // Sede asignada. Obligatoria para STAFF; un ADMIN puede no tenerla.
+    // Tienda actual: la sede donde el usuario está operando
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ubicacion_id")
     private Ubicacion ubicacion;
+
+    // Sedes a las que el usuario tiene acceso. Un ADMIN accede a todas aunque la lista esté vacía.
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "usuario_ubicaciones",
+            joinColumns = @JoinColumn(name = "usuario_id"),
+            inverseJoinColumns = @JoinColumn(name = "ubicacion_id")
+    )
+    @Builder.Default
+    private Set<Ubicacion> ubicaciones = new LinkedHashSet<>();
 
     // Cada usuario pertenece a un negocio (La empresa que registró en el formulario)
     @ManyToOne(fetch = FetchType.LAZY)

@@ -4,8 +4,9 @@ import com.fitelyback.backend.modules.tenant.auth.Rol;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 
 public record MiembroCrearRequest(
 
@@ -29,8 +30,6 @@ public record MiembroCrearRequest(
         @NotNull(message = "El rol es obligatorio")
         Rol rol,
 
-        Long ubicacionId,
-
-        @Pattern(regexp = "\\d{4,6}", message = "El PIN debe tener entre 4 y 6 dígitos")
-        String pin
+        // Sedes a las que tendrá acceso. Obligatorio al menos una para STAFF.
+        List<Long> ubicacionIds
 ) {}

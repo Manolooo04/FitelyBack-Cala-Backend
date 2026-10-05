@@ -18,7 +18,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +46,7 @@ public class EquipoService {
             throw new ApiException(HttpStatus.CONFLICT, "El correo ya se encuentra registrado");
         }
 
-        Ubicacion ubicacion = resolverUbicacion(request.ubicacionId(), request.rol(), actual.negocioId());
+        Set<Ubicacion> sedes = resolverSedes(request.ubicacionIds(), request.rol(), actual.negocioId());
 
         Usuario usuario = Usuario.builder()
                 .nombre(request.nombre())
@@ -53,8 +55,8 @@ public class EquipoService {
                 .password(passwordEncoder.encode(request.password()))
                 .proveedor(ProveedorAuth.LOCAL)
                 .rol(request.rol())
-                .pin(request.pin() != null ? passwordEncoder.encode(request.pin()) : null)
-                .ubicacion(ubicacion)
+                .ubicacion(primera(sedes))
+                .ubicaciones(sedes)
                 .negocio(negocioRepository.getReferenceById(actual.negocioId()))
                 .build();
 
@@ -69,17 +71,25 @@ public class EquipoService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "No puedes cambiar tu propio rol");
         }
 
+        Set<Ubicacion> sedes = resolverSedes(request.ubicacionIds(), request.rol(), actual.negocioId());
+
         usuario.setNombre(request.nombre());
         usuario.setApellido(request.apellido());
         usuario.setRol(request.rol());
-        usuario.setUbicacion(resolverUbicacion(request.ubicacionId(), request.rol(), actual.negocioId()));
+        usuario.getUbicaciones().clear();
+        usuario.getUbicaciones().addAll(sedes);
 
-        // Contraseña y PIN solo cambian si se envían
+        // Si la tienda actual ya no está entre sus sedes, pasa a la primera de la lista
+        Ubicacion tiendaActual = usuario.getUbicacion();
+        boolean sigueTeniendoAcceso = tiendaActual != null
+                && sedes.stream().anyMatch(s -> s.getId().equals(tiendaActual.getId()));
+        if (!sigueTeniendoAcceso) {
+            usuario.setUbicacion(primera(sedes));
+        }
+
+        // La contraseña solo cambia si se envía
         if (request.password() != null) {
             usuario.setPassword(passwordEncoder.encode(request.password()));
-        }
-        if (request.pin() != null) {
-            usuario.setPin(passwordEncoder.encode(request.pin()));
         }
 
         return aResponse(usuario, nombresDeSedes(actual.negocioId()), actual);
@@ -101,16 +111,25 @@ public class EquipoService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Miembro no encontrado"));
     }
 
-    // Valida que la sede exista en este negocio y que todo STAFF tenga una
-    private Ubicacion resolverUbicacion(Long ubicacionId, Rol rol, Long negocioId) {
-        if (ubicacionId == null) {
-            if (rol == Rol.STAFF) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Un trabajador debe tener una sede asignada");
-            }
-            return null;
+    // Valida que cada sede exista en este negocio y que todo STAFF tenga al menos una
+    private Set<Ubicacion> resolverSedes(List<Long> ubicacionIds, Rol rol, Long negocioId) {
+        List<Long> ids = ubicacionIds == null ? List.of() : ubicacionIds.stream().distinct().toList();
+
+        if (ids.isEmpty() && rol == Rol.STAFF) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Un trabajador debe tener al menos una sede asignada");
         }
-        return ubicacionRepository.findByIdAndNegocioId(ubicacionId, negocioId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Ubicación no encontrada"));
+
+        Set<Ubicacion> sedes = new LinkedHashSet<>();
+        for (Long ubicacionId : ids) {
+            sedes.add(ubicacionRepository.findByIdAndNegocioId(ubicacionId, negocioId)
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
+                            "Ubicación no encontrada: " + ubicacionId)));
+        }
+        return sedes;
+    }
+
+    private Ubicacion primera(Set<Ubicacion> sedes) {
+        return sedes.isEmpty() ? null : sedes.iterator().next();
     }
 
     private List<String> nombresDeSedes(Long negocioId) {
@@ -125,12 +144,12 @@ public class EquipoService {
     }
 
     private MiembroResponse aResponse(Usuario u, List<String> todasLasSedes, UsuarioAutenticado actual) {
-        Ubicacion sede = u.getUbicacion();
+        Ubicacion tiendaActual = u.getUbicacion();
 
-        // Un ADMIN accede a todas las sedes; un STAFF solo a la suya
+        // Un ADMIN accede a todas las sedes; un STAFF solo a las asignadas
         List<String> acceso = u.getRol() == Rol.ADMIN
                 ? todasLasSedes
-                : (sede != null ? List.of(sede.getNombre()) : List.of());
+                : u.getUbicaciones().stream().map(Ubicacion::getNombre).toList();
 
         return new MiembroResponse(
                 u.getId(),
@@ -138,10 +157,9 @@ public class EquipoService {
                 u.getApellido(),
                 u.getEmail(),
                 u.getRol(),
-                sede != null ? sede.getId() : null,
-                sede != null ? sede.getNombre() : null,
+                tiendaActual != null ? tiendaActual.getNombre() : null,
+                u.getUbicaciones().stream().map(Ubicacion::getId).toList(),
                 acceso,
-                u.getPin() != null,
                 esLaCuentaActual(u, actual)
         );
     }

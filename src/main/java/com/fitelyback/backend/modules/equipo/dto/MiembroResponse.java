@@ -10,9 +10,8 @@ public record MiembroResponse(
         String apellido,
         String email,
         Rol rol,
-        Long ubicacionId,
         String tiendaActual,
+        List<Long> ubicacionIds,
         List<String> accesoTiendas,
-        boolean tienePin,
         boolean esTuCuenta
 ) {}
