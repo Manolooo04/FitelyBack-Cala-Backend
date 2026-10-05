@@ -13,6 +13,8 @@ public interface ClienteRepository extends JpaRepository<Cliente, Long> {
 
     Optional<Cliente> findByIdAndNegocioId(Long id, Long negocioId);
 
+    Optional<Cliente> findByNegocioIdAndTelefono(Long negocioId, String telefono);
+
     boolean existsByNegocioIdAndTelefono(Long negocioId, String telefono);
 
     boolean existsByNegocioIdAndTelefonoAndIdNot(Long negocioId, String telefono, Long id);

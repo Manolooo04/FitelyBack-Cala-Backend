@@ -13,6 +13,8 @@ public interface TarjetaPlantillaRepository extends JpaRepository<TarjetaPlantil
 
     List<TarjetaPlantilla> findByNegocioIdAndUbicacionIdOrderByNombreAsc(Long negocioId, Long ubicacionId);
 
+    List<TarjetaPlantilla> findByNegocioIdAndActivaTrueOrderByNombreAsc(Long negocioId);
+
     Optional<TarjetaPlantilla> findByIdAndNegocioId(Long id, Long negocioId);
 
     boolean existsByUbicacionIdAndNombreIgnoreCase(Long ubicacionId, String nombre);

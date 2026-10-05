@@ -4,7 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -16,12 +16,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -39,13 +37,15 @@ public class SecurityConfig {
                 // 2. El backend no guarda sesiones en memoria
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 3. Permisos de las rutas
+                // 3. Permisos de las rutas. El orden importa: anyRequest() siempre va al final.
                 .authorizeHttpRequests(auth -> auth
-                        // Solo registro y login son públicos
+                        // Registro e inicio de sesión del negocio
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        // Registro del cliente y vista de su tarjeta, sin iniciar sesión
+                        .requestMatchers("/api/v1/publico/**").permitAll()
                         // Ruta interna de errores de Spring Boot
                         .requestMatchers("/error").permitAll()
-                        // Todo lo demás (incluido /api/v1/auth/me) exige token
+                        // Todo lo demás exige token
                         .anyRequest().authenticated()
                 )
 
