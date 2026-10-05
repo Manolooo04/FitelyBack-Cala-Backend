@@ -146,6 +146,11 @@ public class TarjetaEmitidaService {
         return tarjetaRepository.save(tarjeta);
     }
 
+    // Vista completa de una tarjeta, para que el módulo de escaneos no repita el armado
+    public TarjetaEmitidaResponse resumen(TarjetaEmitida tarjeta) {
+        return aResponse(tarjeta);
+    }
+
     private void verificarNegocio(Long negocioId) {
         if (!negocioRepository.existsById(negocioId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Negocio no encontrado");

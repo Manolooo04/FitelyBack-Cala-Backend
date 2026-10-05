@@ -5,7 +5,7 @@ import com.fitelyback.backend.modules.ubicaciones.Ubicacion;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
-
+import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -48,6 +48,9 @@ public class Usuario {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ubicacion_id")
     private Ubicacion ubicacion;
+
+    //Hasta cuando tiene el scanner abierto en su tienda actual; vacio si está cerrado
+    private LocalDateTime escanerAbiertoHasta;
 
     // Sedes a las que el usuario tiene acceso. Un ADMIN accede a todas aunque la lista esté vacía.
     @ManyToMany(fetch = FetchType.LAZY)
