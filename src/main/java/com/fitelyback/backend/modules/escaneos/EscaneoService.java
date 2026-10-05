@@ -7,6 +7,7 @@ import com.fitelyback.backend.modules.escaneos.dto.EscaneoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EscanerAbiertoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EstampillasRequest;
 import com.fitelyback.backend.modules.escaneos.dto.RecompensaEscaneadaResponse;
+import com.fitelyback.backend.modules.escaneos.dto.SaldoRequest;
 import com.fitelyback.backend.modules.escaneos.dto.TarjetaEscaneadaResponse;
 import com.fitelyback.backend.modules.recompensas.EstadoRecompensa;
 import com.fitelyback.backend.modules.recompensas.Recompensa;
@@ -95,7 +96,7 @@ public class EscaneoService {
         return aRespuesta(buscarTarjeta(codigo, sedeDelEscaner(usuario), actual));
     }
 
-    // Suma (cantidad positiva) o resta (cantidad negativa) estampillas
+    // Estampillas: suma (cantidad positiva) o resta (cantidad negativa)
     @Transactional
     public TarjetaEscaneadaResponse ajustarEstampillas(String codigo, EstampillasRequest request,
                                                        UsuarioAutenticado actual) {
@@ -111,12 +112,7 @@ public class EscaneoService {
         if (plantilla.getTipo() != TipoTarjeta.ESTAMPILLAS) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta no acumula estampillas");
         }
-        if (tarjeta.getEstado() != EstadoTarjeta.ACTIVA) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta ya no está activa");
-        }
-        if (tarjeta.getFechaVencimiento().isBefore(LocalDate.now())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta está vencida");
-        }
+        validarUtilizable(tarjeta);
 
         int meta = plantilla.getMetaSellos();
         int antes = tarjeta.getSellos();
@@ -151,6 +147,74 @@ public class EscaneoService {
 
         // Genera la recompensa si la tarjeta se completó, o la anula si dejó de estarlo
         recompensaService.sincronizar(tarjeta);
+
+        return aRespuesta(tarjeta);
+    }
+
+    // Niveles: cada escaneo registra una visita; el nivel sube según las visitas acumuladas
+    @Transactional
+    public TarjetaEscaneadaResponse registrarVisita(String codigo, UsuarioAutenticado actual) {
+        Usuario usuario = usuarioActual(actual);
+        Ubicacion sede = sedeDelEscaner(usuario);
+        TarjetaEmitida tarjeta = buscarTarjeta(codigo, sede, actual);
+
+        if (tarjeta.getPlantilla().getTipo() != TipoTarjeta.NIVELES) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta no acumula visitas");
+        }
+        validarUtilizable(tarjeta);
+
+        int antes = tarjeta.getVisitas();
+        int despues = antes + 1;
+        tarjeta.setVisitas(despues);
+
+        escaneoRepository.save(EscaneoTarjeta.builder()
+                .tipo(TipoEscaneo.VISITA)
+                .cantidad(1)
+                .valorAntes(antes)
+                .valorDespues(despues)
+                .tarjeta(tarjeta)
+                .usuario(usuario)
+                .ubicacion(sede)
+                .negocio(tarjeta.getNegocio())
+                .build());
+
+        return aRespuesta(tarjeta);
+    }
+
+    // Giftcard: recarga (monto positivo) o consumo (monto negativo)
+    @Transactional
+    public TarjetaEscaneadaResponse ajustarSaldo(String codigo, SaldoRequest request,
+                                                 UsuarioAutenticado actual) {
+        Usuario usuario = usuarioActual(actual);
+        Ubicacion sede = sedeDelEscaner(usuario);
+        TarjetaEmitida tarjeta = buscarTarjeta(codigo, sede, actual);
+        BigDecimal monto = request.monto();
+
+        if (monto.signum() == 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "El monto no puede ser cero");
+        }
+        if (tarjeta.getPlantilla().getTipo() != TipoTarjeta.GIFTCARD) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta no maneja saldo");
+        }
+        validarUtilizable(tarjeta);
+
+        BigDecimal antes = tarjeta.getSaldo() != null ? tarjeta.getSaldo() : BigDecimal.ZERO;
+        BigDecimal despues = antes.add(monto);
+
+        if (despues.signum() < 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Saldo insuficiente. Disponible: S/ " + antes);
+        }
+
+        tarjeta.setSaldo(despues);
+
+        escaneoRepository.save(EscaneoTarjeta.builder()
+                .tipo(monto.signum() > 0 ? TipoEscaneo.RECARGA : TipoEscaneo.CONSUMO)
+                .monto(monto.abs())
+                .tarjeta(tarjeta)
+                .usuario(usuario)
+                .ubicacion(sede)
+                .negocio(tarjeta.getNegocio())
+                .build());
 
         return aRespuesta(tarjeta);
     }
@@ -234,6 +298,16 @@ public class EscaneoService {
                     "Primero debes ingresar el PIN de la tienda para empezar a escanear");
         }
         return usuario.getUbicacion();
+    }
+
+    // Una tarjeta solo admite movimientos si está activa y vigente
+    private void validarUtilizable(TarjetaEmitida tarjeta) {
+        if (tarjeta.getEstado() != EstadoTarjeta.ACTIVA) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta ya no está activa");
+        }
+        if (tarjeta.getFechaVencimiento().isBefore(LocalDate.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta está vencida");
+        }
     }
 
     private TarjetaEmitida buscarTarjeta(String codigo, Ubicacion sede, UsuarioAutenticado actual) {

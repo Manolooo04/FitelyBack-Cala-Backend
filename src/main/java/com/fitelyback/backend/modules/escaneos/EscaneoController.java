@@ -5,6 +5,7 @@ import com.fitelyback.backend.modules.escaneos.dto.CanjeResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EscanerAbiertoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EstampillasRequest;
 import com.fitelyback.backend.modules.escaneos.dto.RecompensaEscaneadaResponse;
+import com.fitelyback.backend.modules.escaneos.dto.SaldoRequest;
 import com.fitelyback.backend.modules.escaneos.dto.TarjetaEscaneadaResponse;
 import com.fitelyback.backend.security.UsuarioAutenticado;
 import jakarta.validation.Valid;
@@ -42,13 +43,30 @@ public class EscaneoController {
         return ResponseEntity.ok(escaneoService.verTarjeta(codigo, usuario));
     }
 
-    // Agregar o quitar estampillas
+    // Estampillas: agregar o quitar
     @PostMapping("/tarjetas/{codigo}/estampillas")
     public ResponseEntity<TarjetaEscaneadaResponse> ajustarEstampillas(
             @PathVariable String codigo,
             @Valid @RequestBody EstampillasRequest request,
             @AuthenticationPrincipal UsuarioAutenticado usuario) {
         return ResponseEntity.ok(escaneoService.ajustarEstampillas(codigo, request, usuario));
+    }
+
+    // Niveles: registrar una visita
+    @PostMapping("/tarjetas/{codigo}/visitas")
+    public ResponseEntity<TarjetaEscaneadaResponse> registrarVisita(
+            @PathVariable String codigo,
+            @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return ResponseEntity.ok(escaneoService.registrarVisita(codigo, usuario));
+    }
+
+    // Giftcard: recargar o consumir saldo
+    @PostMapping("/tarjetas/{codigo}/saldo")
+    public ResponseEntity<TarjetaEscaneadaResponse> ajustarSaldo(
+            @PathVariable String codigo,
+            @Valid @RequestBody SaldoRequest request,
+            @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return ResponseEntity.ok(escaneoService.ajustarSaldo(codigo, request, usuario));
     }
 
     // Escanear QR recompensa: datos para "Confirmar beneficio"
