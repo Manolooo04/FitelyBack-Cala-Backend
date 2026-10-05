@@ -2,10 +2,16 @@ package com.fitelyback.backend.modules.escaneos;
 
 import com.fitelyback.backend.exception.ApiException;
 import com.fitelyback.backend.modules.escaneos.dto.AbrirEscanerRequest;
+import com.fitelyback.backend.modules.escaneos.dto.CanjeResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EscaneoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EscanerAbiertoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EstampillasRequest;
+import com.fitelyback.backend.modules.escaneos.dto.RecompensaEscaneadaResponse;
 import com.fitelyback.backend.modules.escaneos.dto.TarjetaEscaneadaResponse;
+import com.fitelyback.backend.modules.recompensas.EstadoRecompensa;
+import com.fitelyback.backend.modules.recompensas.Recompensa;
+import com.fitelyback.backend.modules.recompensas.RecompensaRepository;
+import com.fitelyback.backend.modules.recompensas.RecompensaService;
 import com.fitelyback.backend.modules.tarjetas.EstadoTarjeta;
 import com.fitelyback.backend.modules.tarjetas.TarjetaEmitida;
 import com.fitelyback.backend.modules.tarjetas.TarjetaEmitidaRepository;
@@ -15,6 +21,7 @@ import com.fitelyback.backend.modules.tarjetas.TipoTarjeta;
 import com.fitelyback.backend.modules.tenant.auth.Rol;
 import com.fitelyback.backend.modules.tenant.auth.Usuario;
 import com.fitelyback.backend.modules.tenant.auth.UsuarioRepository;
+import com.fitelyback.backend.modules.tenant.clientes.Cliente;
 import com.fitelyback.backend.modules.ubicaciones.Ubicacion;
 import com.fitelyback.backend.modules.ubicaciones.UbicacionRepository;
 import com.fitelyback.backend.security.UsuarioAutenticado;
@@ -27,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -34,16 +42,21 @@ import java.util.List;
 public class EscaneoService {
 
     private static final String PREFIJO_TARJETA = "T-";
+    private static final String PREFIJO_RECOMPENSA = "R-";
     private static final int HORAS_DE_TURNO = 12;
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy, HH:mm");
 
     private final UsuarioRepository usuarioRepository;
     private final UbicacionRepository ubicacionRepository;
     private final TarjetaEmitidaRepository tarjetaRepository;
     private final EscaneoTarjetaRepository escaneoRepository;
+    private final RecompensaRepository recompensaRepository;
     private final TarjetaEmitidaService tarjetaEmitidaService;
+    private final RecompensaService recompensaService;
     private final PasswordEncoder passwordEncoder;
 
-    // El trabajador elige una sede e ingresa el PIN de la tienda para empezar a escanear
+    // ---------- Ingreso con el PIN de la tienda ----------
+
     @Transactional
     public EscanerAbiertoResponse abrir(AbrirEscanerRequest request, UsuarioAutenticado actual) {
         Usuario usuario = usuarioActual(actual);
@@ -74,7 +87,8 @@ public class EscaneoService {
         usuarioActual(actual).setEscanerAbiertoHasta(null);
     }
 
-    // "Escanear QR tarjeta": muestra la tarjeta con su progreso e historial
+    // ---------- Escanear QR tarjeta ----------
+
     @Transactional(readOnly = true)
     public TarjetaEscaneadaResponse verTarjeta(String codigo, UsuarioAutenticado actual) {
         Usuario usuario = usuarioActual(actual);
@@ -135,8 +149,75 @@ public class EscaneoService {
                 .negocio(tarjeta.getNegocio())
                 .build());
 
+        // Genera la recompensa si la tarjeta se completó, o la anula si dejó de estarlo
+        recompensaService.sincronizar(tarjeta);
+
         return aRespuesta(tarjeta);
     }
+
+    // ---------- Escanear QR recompensa ----------
+
+    // Datos para la pantalla "Confirmar beneficio"
+    @Transactional(readOnly = true)
+    public RecompensaEscaneadaResponse verRecompensa(String codigo, UsuarioAutenticado actual) {
+        Usuario usuario = usuarioActual(actual);
+        Recompensa recompensa = buscarRecompensa(codigo, sedeDelEscaner(usuario), actual);
+        TarjetaEmitida tarjeta = recompensa.getTarjeta();
+
+        return new RecompensaEscaneadaResponse(
+                recompensa.getCodigo(),
+                recompensa.getDescripcion(),
+                nombreCompleto(tarjeta.getCliente()),
+                tarjeta.getPlantilla().getNombre());
+    }
+
+    // Entrega el premio, cierra la tarjeta y le emite al cliente la tarjeta siguiente
+    @Transactional
+    public CanjeResponse canjearRecompensa(String codigo, UsuarioAutenticado actual) {
+        Usuario usuario = usuarioActual(actual);
+        Ubicacion sede = sedeDelEscaner(usuario);
+        Recompensa recompensa = buscarRecompensa(codigo, sede, actual);
+        TarjetaEmitida tarjeta = recompensa.getTarjeta();
+        TarjetaPlantilla plantilla = tarjeta.getPlantilla();
+        Cliente cliente = tarjeta.getCliente();
+
+        tarjeta.setEstado(EstadoTarjeta.CANJEADA);
+        recompensa.setEstado(EstadoRecompensa.CANJEADA);
+        recompensa.setFechaCanje(LocalDateTime.now());
+        recompensa.setCanjeadoPor(usuario);
+
+        // La tarjeta siguiente es la que indica la plantilla; si no indica ninguna, se repite la misma
+        TarjetaPlantilla siguiente = plantilla.getSiguientePlantilla() != null
+                ? plantilla.getSiguientePlantilla()
+                : plantilla;
+
+        TarjetaEmitida nueva = null;
+        boolean puedeEmitirse = siguiente.isActiva()
+                && !tarjetaRepository.existsByClienteIdAndPlantillaIdAndEstado(
+                cliente.getId(), siguiente.getId(), EstadoTarjeta.ACTIVA);
+        if (puedeEmitirse) {
+            nueva = tarjetaEmitidaService.crearTarjeta(cliente, siguiente);
+        }
+        recompensa.setTarjetaSiguiente(nueva);
+
+        escaneoRepository.save(EscaneoTarjeta.builder()
+                .tipo(TipoEscaneo.CANJE)
+                .valorAntes(tarjeta.getSellos())
+                .valorDespues(tarjeta.getSellos())
+                .tarjeta(tarjeta)
+                .usuario(usuario)
+                .ubicacion(sede)
+                .negocio(tarjeta.getNegocio())
+                .build());
+
+        return new CanjeResponse(
+                recompensa.getDescripcion(),
+                nombreCompleto(cliente),
+                nueva != null ? nueva.getCodigo() : null,
+                nueva != null ? siguiente.getNombre() : null);
+    }
+
+    // ---------- Apoyo ----------
 
     private Usuario usuarioActual(UsuarioAutenticado actual) {
         return usuarioRepository.findByEmail(actual.email())
@@ -169,6 +250,38 @@ public class EscaneoService {
                     "Esta tarjeta pertenece a la sede " + tarjeta.getUbicacion().getNombre());
         }
         return tarjeta;
+    }
+
+    private Recompensa buscarRecompensa(String codigo, Ubicacion sede, UsuarioAutenticado actual) {
+        if (codigo == null || !codigo.startsWith(PREFIJO_RECOMPENSA)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Formato de QR de beneficio inválido");
+        }
+
+        Recompensa recompensa = recompensaRepository.findByCodigo(codigo)
+                .filter(r -> actual.negocioId().equals(r.getNegocio().getId()))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Beneficio no encontrado"));
+
+        TarjetaEmitida tarjeta = recompensa.getTarjeta();
+
+        if (recompensa.getEstado() == EstadoRecompensa.CANJEADA) {
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "Este beneficio \"" + recompensa.getDescripcion() + "\" ya fue canjeado por "
+                            + nombreCompleto(tarjeta.getCliente()) + " el "
+                            + recompensa.getFechaCanje().format(FORMATO_FECHA)
+                            + ". No se puede canjear nuevamente.");
+        }
+        if (!tarjeta.getUbicacion().getId().equals(sede.getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Este beneficio pertenece a la sede " + tarjeta.getUbicacion().getNombre());
+        }
+        if (tarjeta.getFechaVencimiento().isBefore(LocalDate.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La tarjeta de este beneficio está vencida");
+        }
+        return recompensa;
+    }
+
+    private String nombreCompleto(Cliente cliente) {
+        return cliente.getNombre() + " " + cliente.getApellido();
     }
 
     private TarjetaEscaneadaResponse aRespuesta(TarjetaEmitida tarjeta) {

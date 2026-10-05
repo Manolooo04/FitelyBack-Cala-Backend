@@ -1,8 +1,10 @@
 package com.fitelyback.backend.modules.escaneos;
 
 import com.fitelyback.backend.modules.escaneos.dto.AbrirEscanerRequest;
+import com.fitelyback.backend.modules.escaneos.dto.CanjeResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EscanerAbiertoResponse;
 import com.fitelyback.backend.modules.escaneos.dto.EstampillasRequest;
+import com.fitelyback.backend.modules.escaneos.dto.RecompensaEscaneadaResponse;
 import com.fitelyback.backend.modules.escaneos.dto.TarjetaEscaneadaResponse;
 import com.fitelyback.backend.security.UsuarioAutenticado;
 import jakarta.validation.Valid;
@@ -47,5 +49,21 @@ public class EscaneoController {
             @Valid @RequestBody EstampillasRequest request,
             @AuthenticationPrincipal UsuarioAutenticado usuario) {
         return ResponseEntity.ok(escaneoService.ajustarEstampillas(codigo, request, usuario));
+    }
+
+    // Escanear QR recompensa: datos para "Confirmar beneficio"
+    @GetMapping("/recompensas/{codigo}")
+    public ResponseEntity<RecompensaEscaneadaResponse> verRecompensa(
+            @PathVariable String codigo,
+            @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return ResponseEntity.ok(escaneoService.verRecompensa(codigo, usuario));
+    }
+
+    // Botón "Confirmar": entrega el premio y emite la tarjeta siguiente
+    @PostMapping("/recompensas/{codigo}/canjear")
+    public ResponseEntity<CanjeResponse> canjearRecompensa(
+            @PathVariable String codigo,
+            @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return ResponseEntity.ok(escaneoService.canjearRecompensa(codigo, usuario));
     }
 }
