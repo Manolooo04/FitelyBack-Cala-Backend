@@ -45,6 +45,7 @@ public class EscaneoService {
     private static final String PREFIJO_TARJETA = "T-";
     private static final String PREFIJO_RECOMPENSA = "R-";
     private static final int HORAS_DE_TURNO = 12;
+    private static final int HORAS_ENTRE_VISITAS = 12;
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy, HH:mm");
 
     private final UsuarioRepository usuarioRepository;
@@ -162,6 +163,14 @@ public class EscaneoService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Esta tarjeta no acumula visitas");
         }
         validarUtilizable(tarjeta);
+
+        // Evita sumar dos visitas seguidas por un doble escaneo
+        boolean visitaReciente = escaneoRepository.existsByTarjetaIdAndTipoAndFechaAfter(
+                tarjeta.getId(), TipoEscaneo.VISITA, LocalDateTime.now().minusHours(HORAS_ENTRE_VISITAS));
+        if (visitaReciente) {
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "Esta tarjeta ya registró una visita en las últimas " + HORAS_ENTRE_VISITAS + " horas");
+        }
 
         int antes = tarjeta.getVisitas();
         int despues = antes + 1;
