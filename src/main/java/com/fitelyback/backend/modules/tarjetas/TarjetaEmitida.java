@@ -1,7 +1,7 @@
 package com.fitelyback.backend.modules.tarjetas;
 
 import com.fitelyback.backend.modules.tenant.Negocio;
-import com.fitelyback.backend.modules.tenant.clientes.Cliente;
+import com.fitelyback.backend.modules.clientes.Cliente;
 import com.fitelyback.backend.modules.ubicaciones.Ubicacion;
 import jakarta.persistence.*;
 import lombok.*;

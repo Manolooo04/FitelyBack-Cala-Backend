@@ -1,7 +1,7 @@
-package com.fitelyback.backend.modules.tenant.clientes;
+package com.fitelyback.backend.modules.clientes;
 
-import com.fitelyback.backend.modules.tenant.clientes.dto.ClienteRequest;
-import com.fitelyback.backend.modules.tenant.clientes.dto.ClienteResponse;
+import com.fitelyback.backend.modules.clientes.dto.ClienteRequest;
+import com.fitelyback.backend.modules.clientes.dto.ClienteResponse;
 import com.fitelyback.backend.security.UsuarioAutenticado;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

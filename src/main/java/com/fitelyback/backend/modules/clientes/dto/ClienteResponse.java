@@ -1,4 +1,4 @@
-package com.fitelyback.backend.modules.tenant.clientes.dto;
+package com.fitelyback.backend.modules.clientes.dto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

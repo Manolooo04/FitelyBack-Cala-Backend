@@ -1,4 +1,4 @@
-package com.fitelyback.backend.modules.tenant.clientes;
+package com.fitelyback.backend.modules.clientes;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

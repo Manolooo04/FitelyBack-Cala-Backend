@@ -22,7 +22,7 @@ import com.fitelyback.backend.modules.tarjetas.TipoTarjeta;
 import com.fitelyback.backend.modules.tenant.auth.Rol;
 import com.fitelyback.backend.modules.tenant.auth.Usuario;
 import com.fitelyback.backend.modules.tenant.auth.UsuarioRepository;
-import com.fitelyback.backend.modules.tenant.clientes.Cliente;
+import com.fitelyback.backend.modules.clientes.Cliente;
 import com.fitelyback.backend.modules.ubicaciones.Ubicacion;
 import com.fitelyback.backend.modules.ubicaciones.UbicacionRepository;
 import com.fitelyback.backend.security.UsuarioAutenticado;

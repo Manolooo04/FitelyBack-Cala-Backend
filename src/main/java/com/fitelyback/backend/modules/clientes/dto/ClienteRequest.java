@@ -1,4 +1,4 @@
-package com.fitelyback.backend.modules.tenant.clientes.dto;
+package com.fitelyback.backend.modules.clientes.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

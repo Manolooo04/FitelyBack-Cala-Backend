@@ -1,4 +1,4 @@
-package com.fitelyback.backend.modules.tenant.clientes;
+package com.fitelyback.backend.modules.clientes;
 
 import com.fitelyback.backend.modules.tenant.Negocio;
 import jakarta.persistence.*;
